@@ -53,9 +53,10 @@ class Studentshipper(discord.Client):
                 else:
                     answer = f"You entered '{msg}', which doesn't look like correct TalTech e-mail. Try again."
             elif state == 1:  # Wait for entering a confirmation code.
-                generated_code = db["users"][user]["code"]
-                if message == generated_code:
-                    self.assign_role(user)
+                generated_code = db["users"][self.get_username(user)]["code"]
+                print(f"===DEBUG: comparing generated code {generated_code} vs entered code {msg}")
+                if msg == generated_code:
+                    await self.assign_role(user)
                     self.update_user_state(user, 2)
                     answer = "Welcome to TalTech-IT-rus!"
             await self.send_message_to(user, answer)
@@ -106,16 +107,15 @@ class Studentshipper(discord.Client):
 
                 Tell it to the Studentship Checker bot."""
         # Only gmail account can be used. Need to provide user (example -> something@gmail.com) and APP password.
-        usr, pwd = os.getenv('MAIL'), os.getenv('PWD')
-        if usr and pwd:
-            yag = yagmail.SMTP(usr, pwd)
+        usr = os.getenv('MAIL')
+        pas = os.getenv('PASS')
+        if usr and pas:
+            yag = yagmail.SMTP(usr, pas)
+            print(f"===DEBUG: sending {code} to {email} from {usr}:{pas}")
+            yag.send(to=email, subject="Studentship Checker code", contents=body)
         else:
-            yag = yagmail.SMTP(user_mail="", password="")
-        yag.send(
-            to=email,
-            subject="Studentship Checker code",
-            contents=body,
-        )
+            print(f"===DEBUG: sending code to {email} failed. No credentials: {usr}, {pas}")
+
 
     def generate_code(self):
         """Generate verification code."""
