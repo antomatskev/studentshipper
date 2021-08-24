@@ -3,6 +3,7 @@ import random
 
 import discord
 import yagmail
+from keep_alive import keep_alive
 from replit import db
 
 
@@ -57,6 +58,7 @@ class Studentshipper(discord.Client):
             answer = "Oops. Something went wrong... Please contact the server's administrator."
             if state == -1:  # Brand new user.
                 await self.talk_to_newbie(user)
+                return
             elif state == 0:  # Getting e-mail and sending a code.
                 if self.is_correct_mail(msg):
                     state = 1
@@ -86,6 +88,8 @@ class Studentshipper(discord.Client):
         try:
             ret = db["users"][self.get_username(user)]["state"]
         except TypeError:
+            ret = -1
+        except KeyError:
             ret = -1
         print(f"===DEBUG: State for user {user} is {ret}")
         return ret
@@ -160,4 +164,5 @@ if "users" not in db.keys():
 
 intents = discord.Intents(messages=True, guilds=True, reactions=True, members=True, presences=True)
 client = Studentshipper(command_prefix=".", intents=intents)
+keep_alive()
 client.run(os.getenv('TOKEN'))
