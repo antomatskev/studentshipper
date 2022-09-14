@@ -55,23 +55,18 @@ class Studentshipper(discord.Client):
             # logging.info(f"===Message object: {message}")
             logging.info(f"===Message content: {msg}, message author: {user}")
             state = self.determine_state(user)
-            answer = "Oops. Something went wrong... Please contact the server's administrator."
+            answer = "Oops. Something went wrong... Type 'resend'. If this doesn't help please contact the server's administrator."
             if state == -1:  # Brand new user.
                 await self.talk_to_newbie(user)
                 return
             elif state == 0:  # Getting e-mail and sending a code.
-                if self.is_correct_mail(msg):
-                    state = 1
-                    code = self.generate_code()
-                    self.update_user(user, state, msg, code)
-                    answer = f"""Sending confirmation code to {msg}. Answer me with the code I've sent you to gain access to our discord server. My letter could be in 'Junk Email'."""
-                    self.send_code_to_mail(msg, code)
-                else:
-                    answer = f"You entered '{msg}', which doesn't look like correct TalTech e-mail. Try again."
+                answer = await self.perform_mail_check(msg, user, state)
             elif state == 1:  # Wait for entering a confirmation code.
                 generated_code = db["users"][self.get_username(user)]["code"]
                 logging.info(f"===comparing generated code and entered code {msg}")
-                if msg == generated_code:
+                if msg.lower() == "resend":
+                    answer = await self.perform_mail_check(msg, user, state)
+                elif msg == generated_code:
                     await self.assign_role(message)
                     self.update_user_state(user, 2)
                     answer = "Welcome to TalTech-IT-rus!"
@@ -156,6 +151,17 @@ class Studentshipper(discord.Client):
     def get_username(self, user):
         """Helper for getting a username consisting of name and discriminator."""
         return user.name + '#' + user.discriminator
+
+    async def perform_mail_check(self, msg, user, state):
+        if self.is_correct_mail(msg):
+            state = 1
+            code = self.generate_code()
+            self.update_user(user, state, msg, code)
+            answer = f"""Sending confirmation code to {msg}. Answer me with the code I've sent you to gain access to our discord server. My letter could be in 'Junk Email'."""
+            self.send_code_to_mail(msg, code)
+        else:
+            answer = f"You entered '{msg}', which doesn't look like correct TalTech e-mail. Try again."
+        return answer
 
 
 logging.basicConfig(filename='bot.log', level=logging.INFO, format='%(asctime)s %(message)s')
