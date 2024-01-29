@@ -17,7 +17,7 @@ class Studentshipper(discord.Client):
 
     async def on_ready(self):
         """This method is invoked after the bot is loaded and ready to use."""
-        logging.info('We have logged in as {0.user}'.format(client))
+        # logging.info('We have logged in as {0.user}'.format(client))
         self._server = client.get_guild(int(os.getenv('SERVER_ID')))
 
     async def on_message(self, message):
@@ -29,13 +29,13 @@ class Studentshipper(discord.Client):
 
     async def on_member_join(self, member):
         """When somebody joins the server, this method is invoked."""
-        logging.info(f"==={member} has joined the server!")
+        logging.debug(f"==={member} has joined the server!")
         await self.talk_to_newbie(member)
 
     async def talk_to_newbie(self, user):
         """This method is invoked, when somebody joins the server, the bot counts such user as newbie and starts
         a conversation."""
-        logging.info(f"===talking to newbie {user}")
+        logging.debug(f"===talking to newbie {user}")
         if user:
             self.add_user(user)
             self.update_user_state(user, 0)
@@ -53,20 +53,20 @@ class Studentshipper(discord.Client):
         user = message.author
         if type(message.channel) is discord.channel.DMChannel:
             # logging.info(f"===Message object: {message}")
-            logging.info(f"===Message content: {msg}, message author: {user}")
+            logging.debug(f"===Message content: {msg}, message author: {user}")
             state = self.determine_state(user)
             answer = "Oops. Something went wrong... Type 'resend'. If this doesn't help please contact the server's administrator."
-            if state == -1:  # Brand new user.
+            if state == -1 or msg.lower() == "resend":  # Brand new user.
                 await self.talk_to_newbie(user)
                 return
+            elif msg.lower() == "resend":
+                answer = await self.perform_mail_check(msg, user, state)
             elif state == 0:  # Getting e-mail and sending a code.
                 answer = await self.perform_mail_check(msg, user, state)
             elif state == 1:  # Wait for entering a confirmation code.
                 generated_code = db["users"][self.get_username(user)]["code"]
-                logging.info(f"===comparing generated code and entered code {msg}")
-                if msg.lower() == "resend":
-                    answer = await self.perform_mail_check(msg, user, state)
-                elif msg == generated_code:
+                logging.debug(f"===comparing generated code and entered code {msg}")
+                if msg == generated_code:
                     await self.assign_role(message)
                     self.update_user_state(user, 2)
                     answer = "Welcome to TalTech-IT-rus!"
@@ -75,8 +75,11 @@ class Studentshipper(discord.Client):
     ####### Helper methods
     async def send_message_to(self, user, answer):
         """Helper for sending messages."""
-        logging.info(f"===sending to {user} the following message: {answer}")
-        await user.send(answer)
+        logging.debug(f"===sending to {user} the following message: {answer}")
+        try:
+          await user.send(answer)
+        except:
+          logging.debug(f"===ERR: couldn't send {answer} to the user {user}!")
 
     def determine_state(self, user):
         """Helper for determining user's state, which is saved to the db."""
@@ -86,22 +89,22 @@ class Studentshipper(discord.Client):
             ret = -1
         except KeyError:
             ret = -1
-        logging.info(f"===State for user {user} is {ret}")
+        logging.debug(f"===State for user {user} is {ret}")
         return ret
 
     def is_correct_mail(self, mail):
         """Check if entered e-mail's domain is correct."""
-        logging.info(f"===checking if an email {mail} is correct")
+        logging.debug(f"===checking if an email {mail} is correct")
         return mail.endswith("ttu.ee") or mail.endswith("taltech.ee")
 
     def add_user(self, user):
         """Adds a user to the db."""
-        logging.info(f"===adding {user} to the database")
+        logging.debug(f"===adding {user} to the database")
         db["users"][self.get_username(user)] = {"state": -1, "email": "email", "code": "12345abcdef"}
 
     def update_user_state(self, user, state):
         """Updates user's state in the db."""
-        logging.info(f"===updating {user}'s state to {state}")
+        logging.debug(f"===updating {user}'s state to {state}")
         username = self.get_username(user)
         db["users"][username]["state"] = state
         # logging.info(f"===updated to {db['users'][username]}")
@@ -129,18 +132,18 @@ class Studentshipper(discord.Client):
             yag = yagmail.SMTP(usr, pas)
             yag.send(to=email, subject="Studentshipper confirmation code", contents=body)
         else:
-            logging.info(f"===sending code to {email} failed.")
+            logging.debug(f"===sending code to {email} failed.")
 
     def generate_code(self):
         """Generate verification code."""
-        logging.info(f"===generating code...")
+        logging.debug(f"===generating code...")
         alphabet = list('1234567890QWERTYUIOPASDFGHJKLZXCVBNM')
         return "".join(map(lambda x: random.choice(alphabet), (["0"] * 32)))
 
     async def assign_role(self, message):
         """Accepting user, changing the role etc."""
         user = self._server.get_member(message.author.id)
-        logging.info(f"===assigning roles to {user}, {type(user)}")
+        logging.debug(f"===assigning roles to {user}, {type(user)}")
         jun = discord.utils.get(self._server.roles, name="джун")
         stud = discord.utils.get(self._server.roles, name="студент")
         intern = discord.utils.get(self._server.roles, name="стажёр")
@@ -164,7 +167,7 @@ class Studentshipper(discord.Client):
         return answer
 
 
-logging.basicConfig(filename='bot.log', level=logging.INFO, format='%(asctime)s %(message)s')
+logging.basicConfig(filename='bot.log', level=logging.DEBUG, format='%(asctime)s %(message)s')
 # Initiate db with the bot itself.
 if "users" not in db.keys():
     db["users"] = {"Studentshipper": {"state": -1, "email": "email", "code": "12345abcdef"}}
@@ -172,4 +175,5 @@ if "users" not in db.keys():
 intents = discord.Intents(messages=True, guilds=True, reactions=True, members=True, presences=True)
 client = Studentshipper(command_prefix=".", intents=intents)
 keep_alive()
+# print(db["users"])
 client.run(os.getenv('TOKEN'))
